@@ -19,8 +19,8 @@ public class GameManager : MonoBehaviour
         if(inputManager == null)
             return;
 
-        float2 startPos = RotateVector(new float2(0, 1), inputManager.angle0);
-        float2 endPos = RotateVector(new float2(0, 1), inputManager.angle1);
+        float2 startPos = MathExtensions.RotateVector(new float2(0, 1), inputManager.angle0);
+        float2 endPos = MathExtensions.RotateVector(new float2(0, 1), inputManager.angle1);
         Gizmos.DrawSphere(new Vector3(startPos.x, startPos.y, -1), 0.1f);
         Gizmos.DrawSphere(new Vector3(endPos.x, endPos.y, -1), 0.1f);
     }
@@ -49,17 +49,5 @@ public class GameManager : MonoBehaviour
         unitManager.Update();
     }
     
-    [BurstCompile]
-    private static float2 RotateVector(float2 vector, float angleInRadians)
-    {
-        float cosAngle = math.cos(angleInRadians);
-        float sinAngle = math.sin(angleInRadians);
-
-        float2x2 rotationMatrix = new float2x2(
-            new float2(cosAngle, -sinAngle),
-            new float2(sinAngle, cosAngle)
-        );
-
-        return math.mul(rotationMatrix, vector);
-    }
+    
 }

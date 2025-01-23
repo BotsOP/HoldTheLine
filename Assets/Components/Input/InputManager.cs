@@ -30,13 +30,13 @@ public class InputManager
         {
             Vector3 mousePos = camera.ScreenToWorldPoint(Input.mousePosition);
             float2 startPos = math.normalize(new float2(mousePos.x, mousePos.y)) * (layer + 1);
-            angle0 = AngleBetween(startPos);
+            angle0 = MathExtensions.AngleBetween(startPos);
         }
         if (Input.GetMouseButton(0))
         {
             Vector3 mousePos = camera.ScreenToWorldPoint(Input.mousePosition);
             float2 endPos = math.normalize(new float2(mousePos.x, mousePos.y)) * (layer + 1);
-            float temp = AngleBetween(endPos);
+            float temp = MathExtensions.AngleBetween(endPos);
 
             if (temp < angle0 && !shiftedSides)
                 shiftedSides = true;
@@ -58,24 +58,5 @@ public class InputManager
         return false;
     }
 
-    [BurstCompile]
-    public static float AngleBetween(float2 vector)
-    {
-        float2 referenceVector = new float2(0, 1);
-
-        float2 normalizedVector = math.normalize(vector);
-
-        float dotProduct = math.dot(normalizedVector, referenceVector);
-        dotProduct = math.clamp(dotProduct, -1.0f, 1.0f);
-
-        float angle = math.acos(dotProduct);
-
-        float crossZ = normalizedVector.x * referenceVector.y - normalizedVector.y * referenceVector.x;
-        if (crossZ < 0)
-        {
-            angle = -angle;
-        }
-
-        return angle;
-    }
+    
 }

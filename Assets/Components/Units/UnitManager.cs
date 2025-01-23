@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Linq;
 using Unity.Burst;
+using Unity.Collections;
 using Unity.Mathematics;
 using UnityEngine;
 
@@ -15,6 +17,8 @@ public class UnitManager
     private Material unitMaterial;
     private RenderParams renderParams;
     private int unitCount;
+
+    private NativeList<UnitSelection> unitSelections0;
 
     public UnitManager(int maxAmountUnits, Material unitMaterial)
     {
@@ -42,11 +46,16 @@ public class UnitManager
     {
         unitDataBuffer?.Dispose();
         commandBuf?.Dispose();
+        
+        foreach (LineSegment lineSegment in unitLineSegments.SelectMany(unitLineSegment => unitLineSegment).ToList())
+        {
+            lineSegment.Dispose();
+        }
     }
 
     public void SpawnUnits(int amount, float angle0, float angle1, float radius, int layer)
     {
-        List<Unit> tempUnits = new List<Unit>();
+        NativeList<Unit> tempUnits = new NativeList<Unit>(Allocator.Persistent);
         for (int i = 0; i < amount; i++)
         {
             float angle = math.radians(math.lerp(angle0, angle1, (i + 1) / (float)amount));
@@ -68,21 +77,54 @@ public class UnitManager
             if (!(angle0 < lineSegment.angle1) && !(angle1 > lineSegment.angle0))
                 continue;
 
-            for (int j = 0; j < lineSegment.units.Count; j++)
+            int2 lineSegmentIndex = new int2(layer, i);
+            int unitSelectionIndex = -1;
+            for (int j = 0; j < unitSelections0.Length; j++)
+            {
+                if (math.all(unitSelections0[j].lineSegmentIndex == lineSegmentIndex))
+                {
+                    unitSelectionIndex = j;
+                    break;
+                }
+            }
+
+            UnitSelection unitSelection;
+            if (unitSelectionIndex == -1)
+            {
+                NativeList<int2> selectedUnits = new NativeList<int2>(Allocator.Persistent);
+                unitSelection = new UnitSelection(lineSegmentIndex, selectedUnits);
+            }
+            else
+            {
+                unitSelection = unitSelections0[unitSelectionIndex];
+            }
+            int startIndex = -1;
+            int amountSelectedUnits = 0;
+
+            for (int j = 0; j < lineSegment.units.Length; j++)
             {
                 Unit unit = lineSegment.units[j];
-                if (!IsAngleBetween(unit.angle, angle0, angle1))
+                if (!MathExtensions.IsAngleBetween(unit.angle, angle0, angle1))
                 {
                     unit.tiredness = 1;
                     lineSegment.units[j] = unit;
+                    amountSelectedUnits++;
+                    
+                    if (startIndex == -1)
+                        startIndex = j;
+                    
                     continue;
                 }
 
                 unit.tiredness = 0;
                 lineSegment.units[j] = unit;
             }
+            
+            if (startIndex != -1)
+                unitSelection.unitIndices.Add(new int2(startIndex, amountSelectedUnits));
         }
     }
+    
     
     public void Update()
     {
@@ -98,47 +140,49 @@ public class UnitManager
             for (int j = 0; j < unitLineSegments[i].Count; j++)
             {
                 LineSegment lineSegment = unitLineSegments[i][j];
-                unitDataBuffer.SetData(lineSegment.units, 0, startIndex, lineSegment.units.Count);
-                startIndex += lineSegment.units.Count;
+                unitDataBuffer.SetData(lineSegment.units.AsArray(), 0, startIndex, lineSegment.units.Length);
+                startIndex += lineSegment.units.Length;
             }
         }
         unitMaterial.SetBuffer("UnitDataBuffer", unitDataBuffer);
         Graphics.RenderMeshIndirect(renderParams, GameManager.quadMesh, commandBuf);
     }
-
-    public static bool IsAngleBetween(float angle, float startAngle, float endAngle)
-    {
-        // Normalize all angles to the range [0, 2π)
-        angle = math.fmod(angle + math.PI * 2, math.PI * 2);
-        startAngle = math.fmod(startAngle + math.PI * 2, math.PI * 2);
-        endAngle = math.fmod(endAngle + math.PI * 2, math.PI * 2);
-
-        // If the range crosses the 0°/360° boundary
-        if (startAngle > endAngle)
-        {
-            return angle >= startAngle || angle <= endAngle;
-        }
-        // Normal range
-        else
-        {
-            return angle >= startAngle && angle <= endAngle;
-        }
-    }
-
     
     public struct LineSegment
     {
         public float angle0;
         public float angle1;
         public int layer;
-        public List<Unit> units;
+        public NativeList<Unit> units;
 
-        public LineSegment(float angle0, float angle1, int layer, List<Unit> units)
+        public LineSegment(float angle0, float angle1, int layer, NativeList<Unit> units)
         {
             this.angle0 = angle0;
             this.angle1 = angle1;
             this.layer = layer;
             this.units = units;
+        }
+
+        public void Dispose()
+        {
+            units.Dispose();
+        }
+    }
+
+    public struct UnitSelection
+    {
+        public int2 lineSegmentIndex;
+        public NativeList<int2> unitIndices;
+
+        public UnitSelection(int2 lineSegmentIndex, NativeList<int2> unitIndices)
+        {
+            this.lineSegmentIndex = lineSegmentIndex;
+            this.unitIndices = unitIndices;
+        }
+
+        public void Dispose()
+        {
+            unitIndices.Dispose();
         }
     }
     
