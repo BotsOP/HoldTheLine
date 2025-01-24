@@ -40,7 +40,7 @@ Material:
     m_Floats:
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _UnitCount: 40
+    - _UnitCount: 70
     m_Colors: []
   m_BuildTextureStacks: []
   m_AllowLocking: 1

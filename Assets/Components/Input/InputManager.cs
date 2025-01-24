@@ -53,7 +53,7 @@ public class InputManager
         if (Input.GetMouseButtonUp(0))
         {
             shiftedSides = false;
-            Debug.Log($"angles {angle0.ToString("#.##")} {angle1.ToString("#.##")}");
+            // Debug.Log($"angles {angle0.ToString("#.##")} {angle1.ToString("#.##")}");
         }
         return false;
     }

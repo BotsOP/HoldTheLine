@@ -19,8 +19,8 @@ public class GameManager : MonoBehaviour
         if(inputManager == null)
             return;
 
-        float2 startPos = MathExtensions.RotateVector(new float2(0, 1), inputManager.angle0);
-        float2 endPos = MathExtensions.RotateVector(new float2(0, 1), inputManager.angle1);
+        MathExtensions.RotateVector(new float2(0, 1), inputManager.angle0, out float2 startPos);
+        MathExtensions.RotateVector(new float2(0, 1), inputManager.angle1, out float2 endPos);
         Gizmos.DrawSphere(new Vector3(startPos.x, startPos.y, -1), 0.1f);
         Gizmos.DrawSphere(new Vector3(endPos.x, endPos.y, -1), 0.1f);
     }
@@ -30,8 +30,9 @@ public class GameManager : MonoBehaviour
         quadMesh = mesh;
         unitManager = new UnitManager(maxAmountUnits, unitMaterial);
         inputManager = new InputManager(Camera.main, 3);
-        unitManager.SpawnUnits(30, 0,  360, 1, 0);
-        unitManager.SpawnUnits(10, 0,  360, 2, 1);
+        unitManager.SpawnUnits(30, 0,  30, 2, 1);
+        unitManager.SpawnUnits(30, 110,  140, 2, 1);
+        unitManager.SpawnUnits(10, 45,  90, 1, 0);
     }
 
     private void OnDisable()
@@ -42,9 +43,24 @@ public class GameManager : MonoBehaviour
     private void Update()
     {
         inputManager.GetLayerInput();
-        if (inputManager.GetSelectionInput())
+        inputManager.GetSelectionInput();
+        
+        if (Input.GetMouseButtonDown(0))
+        {
+            unitManager.SelectUnitsDown(inputManager.angle0, inputManager.layer);
+        }
+        if (Input.GetMouseButton(0))
         {
             unitManager.SelectUnits(inputManager.angle0, inputManager.angle1, inputManager.layer);
+        }
+        if (Input.GetMouseButtonUp(0))
+        {
+            unitManager.SelectUnitsUp();
+        }
+        
+        if (Input.GetMouseButtonDown(1))
+        {
+            unitManager.MergeUnits();
         }
         unitManager.Update();
     }

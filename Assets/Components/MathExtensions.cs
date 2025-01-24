@@ -26,7 +26,7 @@ public static class MathExtensions
     }
     
     [BurstCompile]
-    public static float AngleBetween(float2 vector)
+    public static float AngleBetween(in float2 vector)
     {
         float2 referenceVector = new float2(0, 1);
 
@@ -47,7 +47,7 @@ public static class MathExtensions
     }
     
     [BurstCompile]
-    public static float2 RotateVector(float2 vector, float angleInRadians)
+    public static void RotateVector(in float2 vector, float angleInRadians, out float2 output)
     {
         float cosAngle = math.cos(angleInRadians);
         float sinAngle = math.sin(angleInRadians);
@@ -57,6 +57,20 @@ public static class MathExtensions
             new float2(sinAngle, cosAngle)
         );
 
-        return math.mul(rotationMatrix, vector);
+        output = math.mul(rotationMatrix, vector);
+    }
+    
+    [BurstCompile]
+    public static float ClampAngle(float angle)
+    {
+        if (angle > math.PI)
+        {
+            angle -= math.PI * 2;
+        }
+        if (angle < -math.PI)
+        {
+            angle += math.PI * 2;
+        }
+        return angle;
     }
 }

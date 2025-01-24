@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Unity.Burst;
@@ -7,6 +8,8 @@ using UnityEngine;
 
 public class UnitManager
 {
+    private const float UNIT_WDITH = 0.05f;
+    
     public List<LineSegment>[] unitLineSegments;
     
     private ComputeBuffer unitDataBuffer;
@@ -19,6 +22,12 @@ public class UnitManager
     private int unitCount;
 
     private NativeList<UnitSelection> unitSelections0;
+    private NativeList<UnitSelection> unitSelections1;
+    private int amountSelectedUnits;
+    private int startSelectedIndex;
+    private int cachedUnitSelectionIndex;
+    private UnitSelection selectedUnitSelection;
+    private int selectionIndex;
 
     public UnitManager(int maxAmountUnits, Material unitMaterial)
     {
@@ -30,8 +39,10 @@ public class UnitManager
         {
             unitLineSegments[i] = new List<LineSegment>();
         }
+        
+        unitSelections0 = new NativeList<UnitSelection>(Allocator.Persistent);
 
-        unitDataBuffer = new ComputeBuffer(maxAmountUnits, sizeof(float) * 5);
+        unitDataBuffer = new ComputeBuffer(maxAmountUnits, sizeof(float) * 8);
         commandBuf = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 1, GraphicsBuffer.IndirectDrawIndexedArgs.size);
         commandData = new GraphicsBuffer.IndirectDrawIndexedArgs[1];
         
@@ -44,13 +55,18 @@ public class UnitManager
 
     public void Dispose()
     {
-        unitDataBuffer?.Dispose();
-        commandBuf?.Dispose();
-        
         foreach (LineSegment lineSegment in unitLineSegments.SelectMany(unitLineSegment => unitLineSegment).ToList())
         {
             lineSegment.Dispose();
         }
+        for (int i = 0; i < unitSelections0.Length; i++)
+        {
+            unitSelections0[i].unitIndices.Dispose();
+        }
+        
+        unitDataBuffer?.Dispose();
+        commandBuf?.Dispose();
+        unitSelections0.Dispose();
     }
 
     public void SpawnUnits(int amount, float angle0, float angle1, float radius, int layer)
@@ -63,65 +79,257 @@ public class UnitManager
             tempUnits.Add(unit);
             unitCount++;
         }
-        LineSegment lineSegment = new LineSegment(angle0, angle1, layer, tempUnits);
+        LineSegment lineSegment = new LineSegment(math.radians(angle0), math.radians(angle1), layer, tempUnits);
         unitLineSegments[layer].Add(lineSegment);
         
         renderParams.material.SetFloat("_UnitCount", unitCount);
     }
-    
+
+    public void SelectUnitsDown(float angle, int layer)
+    {
+        startSelectedIndex = -1;
+        amountSelectedUnits = 0;
+        for (int i = 0; i < unitLineSegments[layer].Count; i++)
+        {
+            LineSegment lineSegment = unitLineSegments[layer][i];
+            if (angle < lineSegment.angle0 || angle > lineSegment.angle1)
+                continue;
+
+            int2 lineSegmentIndex = new int2(layer, i);
+            cachedLineSegmentIndex = lineSegmentIndex;
+            Debug.Log(cachedLineSegmentIndex);
+            
+            //Check if there is already an existing unit selection
+            selectionIndex = -1;
+            for (int j = 0; j < unitSelections0.Length; j++)
+            {
+                if (math.all(unitSelections0[j].lineSegmentIndex == lineSegmentIndex))
+                {
+                    selectionIndex = j;
+                    break;
+                }
+            }
+
+            selectionIndex = -1;
+            for (int j = 0; j < unitSelections0.Length; j++)
+            {
+                if (math.all(unitSelections0[j].lineSegmentIndex == lineSegmentIndex))
+                {
+                    selectionIndex = j;
+                    break;
+                }
+            }
+        }
+    }
+
+    private int2 cachedLineSegmentIndex;
     public void SelectUnits(float angle0, float angle1, int layer)
     {
         for (int i = 0; i < unitLineSegments[layer].Count; i++)
         {
             LineSegment lineSegment = unitLineSegments[layer][i];
-            if (!(angle0 < lineSegment.angle1) && !(angle1 > lineSegment.angle0))
+            if (!(angle0 > lineSegment.angle0 && angle0 < lineSegment.angle1 ||
+                 angle1 > lineSegment.angle0 && angle1 < lineSegment.angle1))
                 continue;
 
             int2 lineSegmentIndex = new int2(layer, i);
-            int unitSelectionIndex = -1;
-            for (int j = 0; j < unitSelections0.Length; j++)
+            if (math.all(cachedLineSegmentIndex != lineSegmentIndex))
             {
-                if (math.all(unitSelections0[j].lineSegmentIndex == lineSegmentIndex))
-                {
-                    unitSelectionIndex = j;
-                    break;
-                }
+                startSelectedIndex = -1;
+                amountSelectedUnits = 0;
+                SelectUnitsDown(angle1, layer);
+                return;
             }
-
-            UnitSelection unitSelection;
-            if (unitSelectionIndex == -1)
-            {
-                NativeList<int2> selectedUnits = new NativeList<int2>(Allocator.Persistent);
-                unitSelection = new UnitSelection(lineSegmentIndex, selectedUnits);
-            }
-            else
-            {
-                unitSelection = unitSelections0[unitSelectionIndex];
-            }
-            int startIndex = -1;
-            int amountSelectedUnits = 0;
-
+            //Check if there is already an existing unit selection
+            
             for (int j = 0; j < lineSegment.units.Length; j++)
             {
                 Unit unit = lineSegment.units[j];
-                if (!MathExtensions.IsAngleBetween(unit.angle, angle0, angle1))
+                if (!MathExtensions.IsAngleBetween(unit.angle, angle0, angle1) || unit.selected == 1)
                 {
-                    unit.tiredness = 1;
-                    lineSegment.units[j] = unit;
-                    amountSelectedUnits++;
-                    
-                    if (startIndex == -1)
-                        startIndex = j;
-                    
                     continue;
                 }
 
+                amountSelectedUnits++;
+                    
+                if (startSelectedIndex == -1)
+                    startSelectedIndex = j;
+                
                 unit.tiredness = 0;
+                unit.selected = 1;
                 lineSegment.units[j] = unit;
             }
+        }
+    }
+
+    public void SelectUnitsUp()
+    {
+        if (startSelectedIndex == -1)
+            return;
+        
+        if (selectionIndex == -1)
+        {
+            NativeList<int2> selectedUnits = new NativeList<int2>(Allocator.Persistent);
+            selectedUnitSelection = new UnitSelection(cachedLineSegmentIndex, selectedUnits);
+            selectedUnitSelection.unitIndices.Add(new int2(startSelectedIndex, amountSelectedUnits));
+            unitSelections0.Add(selectedUnitSelection);
+            Debug.Log($"2: {selectedUnitSelection.unitIndices.Length}");
+            return;
+        }
+        
+        unitSelections0[selectionIndex].unitIndices.Add(new int2(startSelectedIndex, amountSelectedUnits));
+        Debug.Log($"1: {unitSelections0[selectionIndex].unitIndices.Length}");
+    }
+    
+    // public void SelectUnits(float angle0, float angle1, int layer)
+    // {
+    //     for (int i = 0; i < unitLineSegments[layer].Count; i++)
+    //     {
+    //         LineSegment lineSegment = unitLineSegments[layer][i];
+    //         if (!(angle0 < lineSegment.angle1) && !(angle1 > lineSegment.angle0))
+    //             continue;
+    //
+    //         int2 lineSegmentIndex = new int2(layer, i);
+    //         int unitSelectionIndex = -1;
+    //         for (int j = 0; j < unitSelections0.Length; j++)
+    //         {
+    //             if (math.all(unitSelections0[j].lineSegmentIndex == lineSegmentIndex))
+    //             {
+    //                 unitSelectionIndex = j;
+    //                 break;
+    //             }
+    //         }
+    //
+    //         UnitSelection unitSelection;
+    //         if (unitSelectionIndex == -1)
+    //         {
+    //             NativeList<int2> selectedUnits = new NativeList<int2>(Allocator.Persistent);
+    //             unitSelection = new UnitSelection(lineSegmentIndex, selectedUnits);
+    //         }
+    //         else
+    //         {
+    //             unitSelection = unitSelections0[unitSelectionIndex];
+    //         }
+    //         int startIndex = -1;
+    //         int amountSelectedUnits = 0;
+    //
+    //         for (int j = 0; j < lineSegment.units.Length; j++)
+    //         {
+    //             Unit unit = lineSegment.units[j];
+    //             if (!MathExtensions.IsAngleBetween(unit.angle, angle0, angle1))
+    //             {
+    //                 continue;
+    //             }
+    //
+    //             amountSelectedUnits++;
+    //                 
+    //             if (startIndex == -1)
+    //                 startIndex = j;
+    //             
+    //             unit.tiredness = 0;
+    //             lineSegment.units[j] = unit;
+    //         }
+    //         
+    //         if (startIndex != -1)
+    //             unitSelection.unitIndices.Add(new int2(startIndex, amountSelectedUnits));
+    //         if(unitSelectionIndex == -1)
+    //             unitSelections0.Add(unitSelection);
+    //     }
+    // }
+
+    public void MergeUnits()
+    {
+        LineSegment unitLineSegment = unitLineSegments[0][0];
+        NativeList<UnitWithReference> unitsLeft = new NativeList<UnitWithReference>(Allocator.Temp);
+        NativeList<UnitWithReference> unitsRight = new NativeList<UnitWithReference>(Allocator.Temp);
+        for (int i = 0; i < unitSelections0.Length; i++)
+        {
+            UnitSelection unitSelection = unitSelections0[i];
+            LineSegment tempLineSegment = unitLineSegments[unitSelection.lineSegmentIndex.x][unitSelection.lineSegmentIndex.y];
+            if (tempLineSegment.angle1 < unitLineSegment.angle0)
+            {
+                for (int j = 0; j < unitSelection.unitIndices.Length; j++)
+                {
+                    for (int k = unitSelection.unitIndices[j].x; k < unitSelection.unitIndices[j].y; k++)
+                    {
+                        Unit unit = tempLineSegment.units[k];
+                        int3 index = new int3(unitSelection.lineSegmentIndex.x, unitSelection.lineSegmentIndex.y, k);
+                        unitsLeft.Add(new UnitWithReference(unit, index));
+                    }
+                }
+            }
+            if (tempLineSegment.angle0 > unitLineSegment.angle1)
+            {
+                for (int j = 0; j < unitSelection.unitIndices.Length; j++)
+                {
+                    for (int k = unitSelection.unitIndices[j].x; k < unitSelection.unitIndices[j].y; k++)
+                    {
+                        Unit unit = tempLineSegment.units[k];
+                        int3 index = new int3(unitSelection.lineSegmentIndex.x, unitSelection.lineSegmentIndex.y, k);
+                        unitsRight.Add(new UnitWithReference(unit, index));
+                    }
+                }
+            }
+        }
+        unitsLeft.Sort(new SortUnits(unitLineSegment.angle0));
+        float desiredAngle = unitLineSegment.angle0;
+        for (int i = 0; i < unitsLeft.Length; i++)
+        {
+            UnitWithReference unitWithReference = unitsLeft[i];
+            Unit unit = unitsLeft[i].unit;
+            unit.desiredAngle = desiredAngle;
             
-            if (startIndex != -1)
-                unitSelection.unitIndices.Add(new int2(startIndex, amountSelectedUnits));
+            LineSegment lineSegment = unitLineSegments[unitWithReference.index.x][unitWithReference.index.y];
+            lineSegment.units[unitWithReference.index.z] = unit;
+            unitLineSegments[unitWithReference.index.x][unitWithReference.index.y] = lineSegment;
+            
+            desiredAngle -= UNIT_WDITH;
+            desiredAngle = MathExtensions.ClampAngle(desiredAngle);
+        }
+        unitsRight.Sort(new SortUnits(unitLineSegment.angle1));
+        desiredAngle = unitLineSegment.angle1;
+        for (int i = 0; i < unitsRight.Length; i++)
+        {
+            UnitWithReference unitWithReference = unitsRight[i];
+            Unit unit = unitsRight[i].unit;
+            unit.desiredAngle = desiredAngle;
+            
+            LineSegment lineSegment = unitLineSegments[unitWithReference.index.x][unitWithReference.index.y];
+            lineSegment.units[unitWithReference.index.z] = unit;
+            unitLineSegments[unitWithReference.index.x][unitWithReference.index.y] = lineSegment;
+            
+            desiredAngle += UNIT_WDITH;
+            desiredAngle = MathExtensions.ClampAngle(desiredAngle);
+        }
+        unitsLeft.Dispose();
+        unitsRight.Dispose();
+    }
+
+    public void MoveUnits()
+    {
+        for (int i = 0; i < unitLineSegments.Length; i++)
+        {
+            for (int j = 0; j < unitLineSegments[i].Count; j++)
+            {
+                LineSegment lineSegment = unitLineSegments[i][j];
+                for (int k = 0; k < lineSegment.units.Length; k++)
+                {
+                    Unit unit = lineSegment.units[k];
+                    
+                    if(math.abs(unit.angle - unit.desiredAngle) < math.radians(UNIT_WDITH))
+                        continue;
+                    
+                    if (unit.angle < unit.desiredAngle)
+                    {
+                        unit.angle += math.radians(Time.deltaTime * unit.speed);
+                    }
+                    if (unit.angle > unit.desiredAngle)
+                    {
+                        unit.angle -= math.radians(Time.deltaTime * unit.speed);
+                    }
+                    lineSegment.units[k] = unit;
+                }
+            }
         }
     }
     
@@ -133,6 +341,8 @@ public class UnitManager
             Debug.LogError($"{unitCount} too many units");
             return;
         }
+
+        MoveUnits();
 
         int startIndex = 0;
         for (int i = 0; i < unitLineSegments.Length; i++)
@@ -171,8 +381,8 @@ public class UnitManager
 
     public struct UnitSelection
     {
-        public int2 lineSegmentIndex;
-        public NativeList<int2> unitIndices;
+        public int2 lineSegmentIndex; //x = layer, y = lineSegment
+        public NativeList<int2> unitIndices; //x = start, y = amount
 
         public UnitSelection(int2 lineSegmentIndex, NativeList<int2> unitIndices)
         {
@@ -189,9 +399,12 @@ public class UnitManager
     public struct Unit
     {
         public float angle;
+        public float desiredAngle;
+        public float speed;
         public float radius;
         public float tiredness;
         public float health;
+        public int selected;
         public int layer;
 
         public Unit(float angle, float radius, float tiredness, float health, int layer)
@@ -201,6 +414,42 @@ public class UnitManager
             this.tiredness = tiredness;
             this.health = health;
             this.layer = layer;
+            desiredAngle = angle;
+            speed = 10;
+            selected = 0;
+        }
+    }
+
+    public struct UnitWithReference
+    {
+        public Unit unit;
+        public int3 index; //x = layer, y = lineSegment, z = unitIndex
+
+        public UnitWithReference(Unit unit, int3 index)
+        {
+            this.unit = unit;
+            this.index = index;
+        }
+    }
+
+    public struct SortUnits : IComparer<UnitWithReference>
+    {
+        public float desiredAngle;
+        public SortUnits(float desiredAngle)
+        {
+            this.desiredAngle = desiredAngle;
+        }
+        public int Compare(UnitWithReference x, UnitWithReference y)
+        {
+            if (math.all(x.index == y.index))
+            {
+                return 0;
+            }
+            if (math.abs(x.unit.angle - desiredAngle) * x.unit.speed < math.abs(y.unit.angle - desiredAngle) * x.unit.speed)
+            {
+                return -1;
+            }
+            return 1;
         }
     }
 }

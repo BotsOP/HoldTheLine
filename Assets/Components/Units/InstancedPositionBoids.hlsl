@@ -4,9 +4,12 @@
 struct Unit
 {
     float angle;
+    float desiredAngle;
+    float speed;
     float radius;
     float tiredness;
     float health;
+    int selected;
     int layer;
 };
 
