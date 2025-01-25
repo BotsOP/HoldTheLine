@@ -15,7 +15,7 @@ public class InputManager
     public InputManager(Camera camera, int maxLayer)
     {
         this.camera = camera;
-        this.maxLayer = maxLayer;
+        this.maxLayer = maxLayer - 1;
     }
 
     public void GetLayerInput()

@@ -157,7 +157,7 @@
                 "m_Node": {
                     "m_Id": "4e909903601e4135ae5c7658ae67efb8"
                 },
-                "m_SlotId": 1
+                "m_SlotId": 0
             }
         },
         {
@@ -171,7 +171,7 @@
                 "m_Node": {
                     "m_Id": "4e909903601e4135ae5c7658ae67efb8"
                 },
-                "m_SlotId": 0
+                "m_SlotId": 1
             }
         },
         {
@@ -319,6 +319,21 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
+    "m_ObjectId": "037d5586a028442497658250b78d42ba",
+    "m_Id": 0,
+    "m_DisplayName": "selected",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "selected",
+    "m_StageCapability": 1,
+    "m_Value": 0.0,
+    "m_DefaultValue": 0.0,
+    "m_Labels": []
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.BlockNode",
     "m_ObjectId": "04195c1cc67141f7b6b5ad93d040239a",
     "m_Group": {
@@ -422,6 +437,21 @@
         "m_SerializableColors": []
     },
     "m_SerializedDescriptor": "SurfaceDescription.AlphaClipThreshold"
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
+    "m_ObjectId": "147fa11c0dbe4aa09ded0f13cd229246",
+    "m_Id": 2,
+    "m_DisplayName": "Selected",
+    "m_SlotType": 1,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "Selected",
+    "m_StageCapability": 3,
+    "m_Value": 0.0,
+    "m_DefaultValue": 0.0,
+    "m_Labels": []
 }
 
 {
@@ -766,7 +796,7 @@
     },
     "m_Slots": [
         {
-            "m_Id": "83aecfadc193468b9d6980e5c2a8a1a2"
+            "m_Id": "037d5586a028442497658250b78d42ba"
         }
     ],
     "synonyms": [],
@@ -777,7 +807,7 @@
     "m_CustomColors": {
         "m_SerializableColors": []
     },
-    "m_SerializedDescriptor": "VertexDescription.tiredness#1"
+    "m_SerializedDescriptor": "VertexDescription.selected#1"
 }
 
 {
@@ -909,7 +939,7 @@
             "m_Id": "39335e19ca08485994f6f6a3157c89f5"
         },
         {
-            "m_Id": "55be6f4ac8694f878d15ed33e509c1c4"
+            "m_Id": "147fa11c0dbe4aa09ded0f13cd229246"
         }
     ],
     "synonyms": [
@@ -926,22 +956,7 @@
     "m_SourceType": 1,
     "m_FunctionName": "proceduralSetup",
     "m_FunctionSource": "",
-    "m_FunctionBody": "#pragma instancing_options procedural:setup\nOut = In;\n\nTiredness = 0;\n#if UNITY_ANY_INSTANCING_ENABLED\nTiredness = UnitDataBuffer[unity_InstanceID].tiredness;\n#endif"
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "55be6f4ac8694f878d15ed33e509c1c4",
-    "m_Id": 2,
-    "m_DisplayName": "Tiredness",
-    "m_SlotType": 1,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "Tiredness",
-    "m_StageCapability": 3,
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": []
+    "m_FunctionBody": "#pragma instancing_options procedural:setup\nOut = In;\n\nSelected = 0;\n#if UNITY_ANY_INSTANCING_ENABLED\nSelected = UnitDataBuffer[unity_InstanceID].selected;\n#endif"
 }
 
 {
@@ -1035,21 +1050,6 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "Out",
     "m_StageCapability": 3,
-    "m_Value": 0.0,
-    "m_DefaultValue": 0.0,
-    "m_Labels": []
-}
-
-{
-    "m_SGVersion": 0,
-    "m_Type": "UnityEditor.ShaderGraph.Vector1MaterialSlot",
-    "m_ObjectId": "83aecfadc193468b9d6980e5c2a8a1a2",
-    "m_Id": 0,
-    "m_DisplayName": "tiredness",
-    "m_SlotType": 0,
-    "m_Hidden": false,
-    "m_ShaderOutputName": "tiredness",
-    "m_StageCapability": 1,
     "m_Value": 0.0,
     "m_DefaultValue": 0.0,
     "m_Labels": []
@@ -1641,7 +1641,7 @@
     "m_Group": {
         "m_Id": ""
     },
-    "m_Name": "tiredness (Custom Interpolator)",
+    "m_Name": "selected (Custom Interpolator)",
     "m_DrawState": {
         "m_Expanded": true,
         "m_Position": {
@@ -1665,7 +1665,7 @@
     "m_CustomColors": {
         "m_SerializableColors": []
     },
-    "customBlockNodeName": "tiredness",
+    "customBlockNodeName": "selected",
     "serializedType": 1
 }
 

@@ -8,7 +8,7 @@ using UnityEngine;
 
 public class UnitManager
 {
-    private const float UNIT_WDITH = 0.05f;
+    private const float UNIT_WDITH = 0.03f;
     
     public List<LineSegment>[] unitLineSegments;
     
@@ -147,7 +147,6 @@ public class UnitManager
                     startSelectedIndex = j;
                 }
                 
-                unit.tiredness = 0;
                 unit.selected = 1;
                 lineSegment.units[j] = unit;
             }
@@ -175,10 +174,19 @@ public class UnitManager
 
     public void MergeUnits()
     {
+        /*
+         * Make new lineSegment by adding all of the selected units
+         * Remove all of the old selected units by sorting the selected lineSegment indices.x
+         * Calculate new lineSegment angles
+         * Sort left and right new units based on angle0
+         * Reset and clear everything
+         */
+        
         LineSegment unitLineSegment = unitLineSegments[0][0];
         NativeList<UnitWithReference> unitsLeft = new NativeList<UnitWithReference>(Allocator.Temp);
         NativeList<UnitWithReference> unitsRight = new NativeList<UnitWithReference>(Allocator.Temp);
         float desiredAngle = unitLineSegment.angle0 + (unitLineSegment.angle1 - unitLineSegment.angle0) / 2;
+        
 
         for (int i = 0; i < unitSelections0.Length; i++)
         {
@@ -196,7 +204,7 @@ public class UnitManager
                     }
                 }
             }
-            if (tempLineSegment.angle0 > desiredAngle)
+            else if (tempLineSegment.angle0 > desiredAngle)
             {
                 for (int j = 0; j < unitSelection.unitIndices.Length; j++)
                 {
@@ -214,6 +222,16 @@ public class UnitManager
         unitsRight.Sort(new SortUnits(unitLineSegment.angle1));
         int unitsLeftCount = unitsLeft.Length;
         int unitsRightCount = unitsRight.Length;
+        for (int i = 0; i < unitsLeftCount; i++)
+        {
+            UnitWithReference unitWithReference = unitsLeft[i];
+            unitLineSegments[unitWithReference.index.x][unitWithReference.index.y].units.RemoveAtSwapBack(unitWithReference.index.z);
+        }
+        for (int i = unitsRightCount - 1; i >= 0; i--)
+        {
+            UnitWithReference unitWithReference = unitsRight[i];
+            unitLineSegments[unitWithReference.index.x][unitWithReference.index.y].units.RemoveAtSwapBack(unitWithReference.index.z);
+        }
         if (unitsLeftCount > unitsRightCount)
         {
             int amount = (unitsLeftCount - unitsRightCount) / 2;
@@ -235,37 +253,84 @@ public class UnitManager
         unitsLeft.Sort(new SortUnits(desiredAngle));
         unitsRight.Sort(new SortUnits(desiredAngle));
         
-        float tempDesiredAngle = desiredAngle;
+        float leftAngle = desiredAngle;
         for (int i = 0; i < unitsLeft.Length; i++)
         {
             UnitWithReference unitWithReference = unitsLeft[i];
             Unit unit = unitsLeft[i].unit;
-            unit.desiredAngle = tempDesiredAngle;
+            unit.desiredAngle = leftAngle;
             
             LineSegment lineSegment = unitLineSegments[unitWithReference.index.x][unitWithReference.index.y];
             lineSegment.units[unitWithReference.index.z] = unit;
             unitLineSegments[unitWithReference.index.x][unitWithReference.index.y] = lineSegment;
             
-            tempDesiredAngle -= UNIT_WDITH;
-            tempDesiredAngle = MathExtensions.ClampAngle(tempDesiredAngle);
+            leftAngle -= UNIT_WDITH;
+            leftAngle = MathExtensions.ClampAngle(leftAngle);
         }
         
-        tempDesiredAngle = desiredAngle;
+        float rightAngle = desiredAngle;
         for (int i = 0; i < unitsRight.Length; i++)
         {
             UnitWithReference unitWithReference = unitsRight[i];
             Unit unit = unitsRight[i].unit;
-            unit.desiredAngle = tempDesiredAngle;
+            unit.desiredAngle = rightAngle;
             
             LineSegment lineSegment = unitLineSegments[unitWithReference.index.x][unitWithReference.index.y];
             lineSegment.units[unitWithReference.index.z] = unit;
             unitLineSegments[unitWithReference.index.x][unitWithReference.index.y] = lineSegment;
             
-            tempDesiredAngle += UNIT_WDITH;
-            tempDesiredAngle = MathExtensions.ClampAngle(tempDesiredAngle);
+            rightAngle += UNIT_WDITH;
+            rightAngle = MathExtensions.ClampAngle(rightAngle);
         }
+
+        for (int i = 0; i < unitSelections0.Length; i++)
+        {
+            UnitSelection unitSelection = unitSelections0[i];
+            LineSegment tempLineSegment = unitLineSegments[unitSelection.lineSegmentIndex.x][unitSelection.lineSegmentIndex.y];
+            ResizeLineSegmentAndClearSelection(tempLineSegment);
+        }
+
+        int layer = unitSelections0[0].lineSegmentIndex.x;
+        NativeList<Unit> newUnits = new NativeList<Unit>(unitsLeftCount + unitsRightCount, Allocator.Persistent);
+        for (int i = 0; i < unitsLeftCount; i++)
+        {
+            newUnits.Add(unitsLeft[i].unit);
+        }
+        for (int i = 0; i < unitsRightCount; i++)
+        {
+            newUnits.Add(unitsRight[i].unit);
+        }
+        LineSegment newLineSegment = new LineSegment(leftAngle, rightAngle, layer, newUnits);
+        unitLineSegments[layer].Add(newLineSegment);
+
+        unitSelections0.Clear();
         unitsLeft.Dispose();
         unitsRight.Dispose();
+    }
+
+    public void ResizeLineSegment(LineSegment lineSegment)
+    {
+        for (int i = 0; i < lineSegment.units.Length; i++)
+        {
+            Unit unit = lineSegment.units[i];
+            float angle = math.radians(math.lerp(lineSegment.angle0, lineSegment.angle1, (i + 1) / (float)lineSegment.units.Length));
+            unit.angle = angle;
+            unit.desiredAngle = angle;
+            lineSegment.units[i] = unit;
+        }
+    }
+    
+    public void ResizeLineSegmentAndClearSelection(LineSegment lineSegment)
+    {
+        for (int i = 0; i < lineSegment.units.Length; i++)
+        {
+            Unit unit = lineSegment.units[i];
+            float angle = math.radians(math.lerp(lineSegment.angle0, lineSegment.angle1, (i + 1) / (float)lineSegment.units.Length));
+            unit.selected = 0;
+            unit.angle = angle;
+            unit.desiredAngle = angle;
+            lineSegment.units[i] = unit;
+        }
     }
 
     public void MoveUnits()
