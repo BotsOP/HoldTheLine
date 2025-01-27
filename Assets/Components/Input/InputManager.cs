@@ -7,10 +7,12 @@ public class InputManager
     public int layer;
     public float angle0;
     public float angle1;
+    public bool shiftedSides;
+    public bool flipped;
     
     private Camera camera;
-    private bool shiftedSides;
     private int maxLayer;
+    private float cachedTemp;
 
     public InputManager(Camera camera, int maxLayer)
     {
@@ -24,38 +26,47 @@ public class InputManager
         layer = math.clamp(layer, 0, maxLayer);
     }
     
-    public bool GetSelectionInput()
+    public void GetSelectionInput()
     {
         if (Input.GetMouseButtonDown(0))
         {
             Vector3 mousePos = camera.ScreenToWorldPoint(Input.mousePosition);
             float2 startPos = math.normalize(new float2(mousePos.x, mousePos.y)) * (layer + 1);
             angle0 = MathExtensions.AngleBetween(startPos);
+            cachedTemp = angle0;
+            flipped = false;
+            shiftedSides = false;
         }
         if (Input.GetMouseButton(0))
         {
             Vector3 mousePos = camera.ScreenToWorldPoint(Input.mousePosition);
             float2 endPos = math.normalize(new float2(mousePos.x, mousePos.y)) * (layer + 1);
             float temp = MathExtensions.AngleBetween(endPos);
-
+            
+            if (math.abs(temp - cachedTemp) > math.PI + math.PIHALF)
+            {
+                flipped = !flipped;
+                Debug.Log($"flipped");
+            }
+            
             if (temp < angle0 && !shiftedSides)
+            {
                 shiftedSides = true;
-            if (temp > angle1 && shiftedSides)
+                Debug.Log($"shifted");
+            }
+            if (temp > angle0 && shiftedSides)
+            {
                 shiftedSides = false;
+                Debug.Log($"unshifted");
+            }
             
-            if (shiftedSides)
-                angle0 = temp;
-            else
-                angle1 = temp;
-            
-            return true;
+            angle1 = temp;
+            cachedTemp = temp;
         }
         if (Input.GetMouseButtonUp(0))
         {
-            shiftedSides = false;
-            // Debug.Log($"angles {angle0.ToString("#.##")} {angle1.ToString("#.##")}");
+            
         }
-        return false;
     }
 
     

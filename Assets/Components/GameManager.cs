@@ -19,10 +19,31 @@ public class GameManager : MonoBehaviour
         if(inputManager == null)
             return;
 
-        MathExtensions.RotateVector(new float2(0, 1), inputManager.angle0, out float2 startPos);
-        MathExtensions.RotateVector(new float2(0, 1), inputManager.angle1, out float2 endPos);
+
+        float angle0 = inputManager.shiftedSides ? inputManager.angle1 : inputManager.angle0;
+        float angle1 = inputManager.shiftedSides ? inputManager.angle0 : inputManager.angle1;
+        MathExtensions.RotateVector(new float2(0, 1), angle0, out float2 startPos);
+        MathExtensions.RotateVector(new float2(0, 1), angle1, out float2 endPos);
+
+        float middleAngle = (angle0 + angle1) / 2;
+        if (inputManager.flipped)
+        {
+            float dist0 = math.abs(-math.PI - angle0);
+            float dist1 = math.PI - angle1;
+            float dist = dist0 + dist1;
+            dist /= 2;
+            // Debug.Log($"{dist0} + {dist1} = {dist}");
+            middleAngle = MathExtensions.ClampAngle(angle1 + dist);
+            Debug.Log($"{middleAngle}");
+        }
+        MathExtensions.RotateVector(new float2(0, 1), middleAngle, out float2 middlePos);
+        
+        Gizmos.color = Color.green;
         Gizmos.DrawSphere(new Vector3(startPos.x, startPos.y, -1), 0.1f);
+        Gizmos.color = Color.red;
         Gizmos.DrawSphere(new Vector3(endPos.x, endPos.y, -1), 0.1f);
+        Gizmos.color = Color.gray;
+        Gizmos.DrawSphere(new Vector3(middlePos.x, middlePos.y, -1), 0.1f);
     }
 
     private void Awake()

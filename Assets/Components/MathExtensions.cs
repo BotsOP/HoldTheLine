@@ -73,4 +73,27 @@ public static class MathExtensions
         }
         return angle;
     }
+
+    [BurstCompile]
+    public static float AddAngle(float angle, float addAngle)
+    {
+        angle += addAngle;
+        if (angle > math.PI)
+        {
+            angle -= math.PI2;
+        }
+        if (angle < -math.PI)
+        {
+            angle += math.PI2;
+        }
+        return angle;
+    }
+    
+    [BurstCompile]
+    public static float DistanceAngle(float x, float y)
+    {
+        float angle0 = math.abs(x - y);
+        float angle1 = math.abs((x - math.PI / 2) - (y - math.PI / 2));
+        return angle0 < angle1 ? angle0 : angle1;
+    }
 }

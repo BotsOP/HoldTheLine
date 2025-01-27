@@ -301,7 +301,6 @@ public class UnitManager
                     Debug.Log($"everyone stopped moving");
                 }
             }
-            
         }
     }
     
