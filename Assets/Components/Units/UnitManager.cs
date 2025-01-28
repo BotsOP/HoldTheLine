@@ -76,17 +76,39 @@ public class UnitManager
         unitLineSegments.Dispose();
     }
 
-    public void SpawnUnits(int amount, float angle0, float angle1, float radius, int layer)
+    public void SpawnUnits(int amount, float angle0, float angle1, int layer)
     {
+        angle0 = MathExtensions.ClampAngle(math.radians(angle0));
+        angle1 = MathExtensions.ClampAngle(math.radians(angle1));
+
         NativeList<Unit> tempUnits = new NativeList<Unit>(Allocator.Persistent);
-        for (int i = 0; i < amount; i++)
+        if (angle0 > angle1)
         {
-            float angle = math.radians(math.lerp(angle0, angle1, (i + 1) / (float)amount));
-            Unit unit = new Unit(angle, layer + 1, 1, 1, layer);
-            tempUnits.Add(unit);
-            unitCount++;
+            float dist0 = math.abs(math.PI - angle0);
+            float dist1 = math.PI + angle1;
+            float distAngles = dist0 + dist1;
+            for (int i = 0; i < amount; i++)
+            {
+                float angle = math.lerp(0, distAngles, (i + 1) / (float)amount);
+                angle += angle0;
+                angle = MathExtensions.ClampAngle(angle);
+                Unit unit = new Unit(angle, layer + 1, 1, 1, layer);
+                tempUnits.Add(unit);
+                unitCount++;
+            }
         }
-        LineSegment lineSegment = new LineSegment(math.radians(angle0), math.radians(angle1), layer, tempUnits);
+        else
+        {
+            for (int i = 0; i < amount; i++)
+            {
+                float angle = math.lerp(angle0, angle1, (i + 1) / (float)amount);
+                Unit unit = new Unit(angle, layer + 1, 1, 1, layer);
+                tempUnits.Add(unit);
+                unitCount++;
+            }
+        }
+        
+        LineSegment lineSegment = new LineSegment(angle0, angle1, layer, tempUnits);
         unitLineSegments[layer].Add(lineSegment);
         
         renderParams.material.SetFloat("_UnitCount", unitCount);
@@ -101,7 +123,7 @@ public class UnitManager
         for (int i = 0; i < unitLineSegments[layer].Length; i++)
         {
             LineSegment lineSegment = unitLineSegments[layer][i];
-            if (angle < lineSegment.angle0 || angle > lineSegment.angle1 || lineSegment.state != 0)
+            if (lineSegment.CheckOverlappingAngle(angle, angle))
                 continue;
 
             int2 lineSegmentIndex = new int2(layer, i);
@@ -125,11 +147,11 @@ public class UnitManager
         for (int i = 0; i < unitLineSegments[layer].Length; i++)
         {
             LineSegment lineSegment = unitLineSegments[layer][i];
-            if (!(angle1 > lineSegment.angle0 && angle1 < lineSegment.angle1) || lineSegment.state != 0)
+            if (lineSegment.CheckOverlappingAngle(angle0, angle1))
                 continue;
 
             int2 lineSegmentIndex = new int2(layer, i);
-            if (cachedLineSegmentIndex.y != lineSegmentIndex.y)
+            if (cachedLineSegmentIndex.x != lineSegmentIndex.x || cachedLineSegmentIndex.y != lineSegmentIndex.y)
             {
                 Debug.Log($"selected new segment");
                 SelectUnitsUp();
@@ -142,9 +164,7 @@ public class UnitManager
             {
                 Unit unit = lineSegment.units[j];
                 if (!MathExtensions.IsAngleBetween(unit.angle, angle0, angle1) || unit.selected == 1)
-                {
                     continue;
-                }
 
                 amountSelectedUnits++;
 
@@ -180,6 +200,9 @@ public class UnitManager
 
     public void MergeUnits()
     {
+        if(unitSelections0.Length == 0)
+            return;
+        
         LineSegment unitLineSegment = unitLineSegments[0][0];
         NativeList<Unit> unitsLeft = new NativeList<Unit>(Allocator.Temp);
         NativeList<Unit> unitsRight = new NativeList<Unit>(Allocator.Temp);
@@ -262,7 +285,7 @@ public class UnitManager
         return lineSegment;
     }
 
-    public void MoveUnits()
+    private void MoveUnits()
     {
         for (int i = 0; i < unitLineSegments.Length; i++)
         {
@@ -326,6 +349,9 @@ public class UnitManager
             }
         }
         
+        commandData[0].instanceCount = (uint)startIndex;
+        commandBuf.SetData(commandData);
+        
         unitMaterial.SetBuffer("UnitDataBuffer", unitDataBuffer);
         Graphics.RenderMeshIndirect(renderParams, GameManager.quadMesh, commandBuf);
     }
@@ -336,6 +362,7 @@ public class UnitManager
         public float angle1;
         public int layer;
         public int state;
+        private bool flipped;
         public NativeList<Unit> units;
 
         public LineSegment(float angle0, float angle1, int layer, NativeList<Unit> units)
@@ -345,6 +372,36 @@ public class UnitManager
             this.layer = layer;
             this.units = units;
             state = 0;
+            flipped = angle0 > angle1;
+        }
+
+        public bool CheckOverlappingAngle(float otherAngle0, float otherAngle1)
+        {
+            if (flipped)
+            {
+                if (state == 0 &&
+                    (otherAngle0 < angle0 || otherAngle0 > angle1) &&
+                    (otherAngle1 < angle0 || otherAngle1 > angle1) && 
+                    (otherAngle0 < angle0 && otherAngle1 < angle0) ||
+                    (otherAngle0 > angle1 && otherAngle1 > angle1))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                if (state == 0 &&
+                    (otherAngle0 > angle0 || otherAngle0 < angle1) &&
+                    (otherAngle1 > angle0 || otherAngle1 < angle1) && 
+                    (otherAngle0 > angle0 && otherAngle1 > angle0) ||
+                    (otherAngle0 < angle1 && otherAngle1 < angle1))
+                {
+                    return false;
+                }
+            }
+            
+            
+            return true;
         }
 
         public void Dispose()

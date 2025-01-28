@@ -370,7 +370,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
-  maxAmountUnits: 100
+  maxAmountUnits: 500
   unitMaterial: {fileID: 2100000, guid: 587d5bc5fa4de3b468ae13a3c465f6ab, type: 2}
 --- !u!4 &1355503902
 Transform:

@@ -20,8 +20,10 @@ public class GameManager : MonoBehaviour
             return;
 
 
-        float angle0 = inputManager.shiftedSides ? inputManager.angle1 : inputManager.angle0;
-        float angle1 = inputManager.shiftedSides ? inputManager.angle0 : inputManager.angle1;
+        // float angle0 = inputManager.shiftedSides ? inputManager.angle1 : inputManager.angle0;
+        // float angle1 = inputManager.shiftedSides ? inputManager.angle0 : inputManager.angle1;
+        float angle0 = inputManager.angle0;
+        float angle1 = inputManager.angle1;
         MathExtensions.RotateVector(new float2(0, 1), angle0, out float2 startPos);
         MathExtensions.RotateVector(new float2(0, 1), angle1, out float2 endPos);
 
@@ -32,9 +34,7 @@ public class GameManager : MonoBehaviour
             float dist1 = math.PI - angle1;
             float dist = dist0 + dist1;
             dist /= 2;
-            // Debug.Log($"{dist0} + {dist1} = {dist}");
             middleAngle = MathExtensions.ClampAngle(angle1 + dist);
-            Debug.Log($"{middleAngle}");
         }
         MathExtensions.RotateVector(new float2(0, 1), middleAngle, out float2 middlePos);
         
@@ -51,9 +51,8 @@ public class GameManager : MonoBehaviour
         quadMesh = mesh;
         unitManager = new UnitManager(maxAmountUnits, unitMaterial);
         inputManager = new InputManager(Camera.main, 3);
-        unitManager.SpawnUnits(30, 0,  30, 2, 1);
-        unitManager.SpawnUnits(30, 110,  140, 2, 1);
-        unitManager.SpawnUnits(10, 45,  90, 1, 0);
+        unitManager.SpawnUnits(50, 140,  210, 1);
+        unitManager.SpawnUnits(10, 45,  90, 0);
     }
 
     private void OnDisable()

@@ -5,6 +5,7 @@ using UnityEngine;
 [BurstCompile]
 public static class MathExtensions
 {
+    
     [BurstCompile]
     public static bool IsAngleBetween(float angle, float startAngle, float endAngle)
     {
@@ -19,10 +20,7 @@ public static class MathExtensions
             return angle >= startAngle || angle <= endAngle;
         }
         // Normal range
-        else
-        {
-            return angle >= startAngle && angle <= endAngle;
-        }
+        return angle >= startAngle && angle <= endAngle;
     }
     
     [BurstCompile]
